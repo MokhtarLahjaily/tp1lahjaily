@@ -52,6 +52,12 @@ public class Bb implements Serializable {
      */
     private StringBuilder conversation = new StringBuilder();
 
+    private String texteRequeteJson;
+
+    private String texteReponseJson;
+
+    private boolean debug = false;
+
     /**
      * Contexte JSF. Utilisé pour qu'un message d'erreur s'affiche dans le formulaire.
      */
@@ -62,6 +68,33 @@ public class Bb implements Serializable {
      * Obligatoire pour un bean CDI (classe gérée par CDI), s'il y a un autre constructeur.
      */
     public Bb() {
+    }
+
+    public String getTexteRequeteJson(){
+        return texteRequeteJson;
+    }
+
+    public void setTexteRequeteJson(String texteRequeteJson) {
+        this.texteRequeteJson = texteRequeteJson;
+    }
+
+    public String getTexteReponseJson(){
+        return texteReponseJson;
+    }
+
+    public void setTexteReponseJson(String texteReponseJson) {
+        this.texteReponseJson = texteReponseJson;
+    }
+
+    public boolean isDebug() {
+        return debug;
+    }
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
+    public void toggleDebug() {
+        this.setDebug(!isDebug());
     }
 
     public String getRoleSysteme() {
