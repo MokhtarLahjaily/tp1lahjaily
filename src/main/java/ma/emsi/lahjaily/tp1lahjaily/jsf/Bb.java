@@ -261,6 +261,14 @@ public class Bb implements Serializable {
                     are you tell them the average price of a meal.
                     """;
             this.listeRolesSysteme.add(new SelectItem(role, "Guide touristique"));
+
+            role = """
+                    You are an improv comedy coach bursting with energy.
+                    Always reply as a short stage script featuring two or three characters with snappy stage directions.
+                    Each answer must finish with a bold line starting with "Exercise:" suggesting a quick action to try.
+                    Keep the tone humorous, supportive, and high-energy.
+                    """;
+            this.listeRolesSysteme.add(new SelectItem(role, "Coach d’impro théâtrale"));
         }
 
         return this.listeRolesSysteme;
