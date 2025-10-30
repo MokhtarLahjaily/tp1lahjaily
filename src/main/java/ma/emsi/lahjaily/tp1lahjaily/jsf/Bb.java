@@ -6,6 +6,11 @@ import jakarta.faces.model.SelectItem;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import jakarta.annotation.PreDestroy;
+import ma.emsi.lahjaily.tp1lahjaily.llm.JsonUtilPourGemini;
+import ma.emsi.lahjaily.tp1lahjaily.llm.LlmClientPourGemini;
+import ma.emsi.lahjaily.tp1lahjaily.llm.LlmInteraction;
+import ma.emsi.lahjaily.tp1lahjaily.llm.RequeteException;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -64,6 +69,13 @@ public class Bb implements Serializable {
     @Inject
     private FacesContext facesContext;
 
+    // 💡 INJECTION DE VOS SERVICES
+    @Inject
+    private JsonUtilPourGemini jsonUtil;
+
+    @Inject
+    private LlmClientPourGemini geminiClient; // Injecté pour pouvoir le fermer
+
     /**
      * Obligatoire pour un bean CDI (classe gérée par CDI), s'il y a un autre constructeur.
      */
@@ -96,7 +108,6 @@ public class Bb implements Serializable {
     public void toggleDebug() {
         this.setDebug(!isDebug());
     }
-
     public String getRoleSysteme() {
         return roleSysteme;
     }
@@ -139,6 +150,18 @@ public class Bb implements Serializable {
     }
 
     /**
+     * 💡 MÉTHODE @PreDestroy POUR FERMER LE CLIENT REST
+     * Appelée par CDI lorsque le bean @ViewScoped est détruit (ex: l'utilisateur quitte la page).
+     * Cela évite les fuites de ressources (resource leaks).
+     */
+    @PreDestroy
+    public void cleanup() {
+        if (geminiClient != null) {
+            geminiClient.closeClient();
+        }
+    }
+
+    /**
      * Envoie la question au serveur.
      * En attendant de l'envoyer à un LLM, le serveur fait un traitement quelconque, juste pour tester :
      * Le traitement consiste à copier la question en minuscules et à l'entourer avec "||". Le rôle système
@@ -148,24 +171,47 @@ public class Bb implements Serializable {
      */
     public String envoyer() {
         if (question == null || question.isBlank()) {
-            // Erreur ! Le formulaire va être réaffiché en réponse à la requête POST, avec un message d'erreur.
             FacesMessage message = new FacesMessage(FacesMessage.SEVERITY_ERROR,
                     "Texte question vide", "Il manque le texte de la question");
             facesContext.addMessage(null, message);
             return null;
         }
-        // Entourer la réponse avec "||".
-        this.reponse = "||";
-        // Si la conversation n'a pas encore commencé, ajouter le rôle système au début de la réponse
-        if (this.conversation.isEmpty()) {
-            // Ajouter le rôle système au début de la réponse
-            this.reponse += roleSysteme.toUpperCase(Locale.FRENCH) + "\n";
-            // Invalide le bouton pour changer le rôle système
-            this.roleSystemeChangeable = false;
+
+        try {
+            // Si la conversation n'a pas encore commencé...
+            if (this.conversation.isEmpty()) {
+                // Définir le rôle système dans notre utilitaire JSON
+                jsonUtil.setSystemRole(this.roleSysteme);
+                // Invalide le bouton pour changer le rôle système
+                this.roleSystemeChangeable = false;
+            }
+
+            // Envoyer la requête à l'API Gemini
+            LlmInteraction interaction = jsonUtil.envoyerRequete(question);
+
+            // Mettre à jour les champs du backing bean avec les résultats
+            this.reponse = interaction.reponseExtraite();
+            this.texteRequeteJson = interaction.questionJson(); // Pour le mode debug
+            this.texteReponseJson = interaction.reponseJson(); // Pour le mode debug
+
+            // La conversation contient l'historique des questions-réponses
+            afficherConversation();
+
+        } catch (RequeteException e) {
+            // Gérer les erreurs de l'API (ex: 400, 429, 500)
+            String detail = (e.getRequeteJson() != null) ? "Voir JSON: " + e.getRequeteJson() : e.toString();
+            FacesMessage message = new FacesMessage(FacesMessage.SEVERITY_ERROR,
+                    "Erreur API: " + e.getMessage(), detail);
+            facesContext.addMessage(null, message);
+            e.printStackTrace(); // Bon pour le débogage côté serveur
+        } catch (Exception e) {
+            // Gérer toutes les autres erreurs (ex: connexion impossible)
+            FacesMessage message = new FacesMessage(FacesMessage.SEVERITY_ERROR,
+                    "Erreur inattendue: " + e.getMessage(), e.toString());
+            facesContext.addMessage(null, message);
+            e.printStackTrace();
         }
-        this.reponse += question.toLowerCase(Locale.FRENCH) + "||";
-        // La conversation contient l'historique des questions-réponses depuis le début.
-        afficherConversation();
+
         return null;
     }
 
